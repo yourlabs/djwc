@@ -8,14 +8,21 @@ introduction for details.
 
 ## Getting started
 
+### How to try djwc
+
+For a quick test:
+
+- clone and enter this repo
+- run `pip install django -e .`
+- start the example with: `./manage.py djwc && ./manage.py runserver`
+
+You should see some polymer components on `localhost:8000`
+
 ### How to install djwc
 
 - `pip install djwc`,
 - add `djwc` to `INSTALLED_APPS` (for the management command)
 - add the `'djwc.middleware.ScriptMiddleware'` `MIDDLEWARE` (to inject scripts).
-
-For a quick test: just clone this repo and run `pip install -e .` then
-`./manage.py djwc && ./manage.py runserver` will start the example.
 
 ### How to use webcomponents
 
