@@ -25,6 +25,8 @@ For a quick test: just clone this repo and run `pip install -e .` then
 
 That's **it** !! The middleware will do the rest.
 
+Read on for details about each step.
+
 ## Declaring components
 
 You can declare components per-app, per-project, and also include bundles.
@@ -71,17 +73,17 @@ DJWC = {
 
 More to come, these are manually maintained at this time.
 
-### `./manage.py djwc`
+## Installing components with `./manage.py djwc`
 
 **Then**, run the `./manage.py djwc` command that will download all the scripts
 into a static directory. Do this prior to collectstatic in production, and
 every-time you change your components declaration.
 
-### That's it !
+## Using components
 
 Just use your new tag wherever you want, such as in templates:
 
-```
+```html
 <paper-input always-float-label label="Floating label"></paper-input>
 ```
 
