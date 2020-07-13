@@ -3,8 +3,6 @@ import re
 from django import apps
 from django.conf import settings
 
-from .registry import ElementRegistry
-
 
 class ScriptMiddleware:
     def __init__(self, get_response):
