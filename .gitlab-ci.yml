@@ -1,0 +1,5 @@
+pypi:
+  stage: deploy
+  image: yourlabs/python
+  script: pypi-release
+  only: [tags]
