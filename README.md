@@ -23,7 +23,7 @@ For a quick test: just clone this repo and run `pip install -e .` then
 - Run `./manage.py djwc` to install them (does not use NodeJS)
 - Use the HTML tags for your components
 
-The middleware will do the rest.
+That's **it** !! The middleware will do the rest.
 
 ## Declaring components
 
