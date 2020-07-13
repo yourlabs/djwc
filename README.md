@@ -25,9 +25,9 @@ For a quick test: just clone this repo and run `pip install -e .` then
 
 The middleware will do the rest.
 
-## Configuring components
+## Declaring components
 
-You can configure components per-app, per-project, and also include bundles.
+You can declare components per-app, per-project, and also include bundles.
 
 ### Settings
 
@@ -75,7 +75,7 @@ More to come, these are manually maintained at this time.
 
 **Then**, run the `./manage.py djwc` command that will download all the scripts
 into a static directory. Do this prior to collectstatic in production, and
-every-time you change your components configuration.
+every-time you change your components declaration.
 
 ### That's it !
 
