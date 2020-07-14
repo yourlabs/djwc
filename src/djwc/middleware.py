@@ -4,7 +4,7 @@ from django import apps
 from django.conf import settings
 
 
-class ScriptMiddleware:
+class StaticMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.app = apps.apps.get_app_config('djwc')

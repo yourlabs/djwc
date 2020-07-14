@@ -22,7 +22,7 @@ You should see some polymer components on `localhost:8000`
 
 - `pip install djwc`,
 - add `djwc` to `INSTALLED_APPS` (for the management command)
-- add the `'djwc.middleware.ScriptMiddleware'` `MIDDLEWARE` (to inject scripts).
+- add the `'djwc.middleware.StaticMiddleware'` `MIDDLEWARE` (to inject scripts).
 
 ### How to use webcomponents
 
