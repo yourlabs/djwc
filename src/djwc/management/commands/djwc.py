@@ -12,141 +12,154 @@ from django.core.management.base import BaseCommand, CommandError
 
 import httpx
 
+import logging
+from async_task_queue import AsyncTask, AsyncTaskQueue
+
 
 class Command(BaseCommand):
     help = 'Download registered webcomponents'
-    downloading = []
 
     def handle(self, *args, **kwargs):
         asyncio.run(self.async_handle(*args, **kwargs))
 
     async def async_handle(self, *args, **kwargs):
         self.djwc = apps.apps.get_app_config('djwc')
-        modules = await self.get_modules(self.djwc.components.values())
-        while modules:
-            modules = await self.install([*modules.values()])
+        self.modules = dict()
 
-    async def install(self, modules):
-        urls = {}
-        for module in modules:
-            latest = module['dist-tags']['latest']
-            url = module['versions'][latest]['dist']['tarball']
-            urls[module['name']] = url
-
-        async def install_tgz(modname, url):
-            target = self.djwc.static / modname
-            if not target.exists():
-                os.makedirs(target)
-
-            if not os.path.exists(os.path.join(target, url.split('/')[-1])):
-                temp = self.djwc.static / url.split('/')[-1]
-                cmd = ' && '.join([
-                    shlex.join(['cd', str(target)]),
-                    shlex.join(['wget', url]),
-                    shlex.join(['tar', 'xvzf', url.split('/')[-1], '--strip=1']),
-                    shlex.join(['rm', '-rf', url.split('/')[-1]]),
-                ])
-                proc = await asyncio.create_subprocess_shell(
-                    cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, stderr = await proc.communicate()
-                print(f'[{cmd!r} exited with {proc.returncode}]')
-
-            with open(os.path.join(target, 'package.json'), 'r') as f:
-                package = f.read()
-            return json.loads(package)
-
-        results = await asyncio.gather(*[
-            install_tgz(modname, url) for modname, url in urls.items()
+        logger = logging.getLogger("foo")
+        self.task_queue = AsyncTaskQueue(
+            logger,
+            batch_size=1,
+            execution_timeout=300
+        )
+        self.task_queue.enqueue([
+            AsyncTask(self.script_install, script)
+            for script in self.djwc.components.values()
         ])
-        dependencies = dict()
-        for result in results:
-            dependencies.update(result.get('dependencies', {}))
+        print(f'Ensuring all dependencies extracted in {self.djwc.static} ...')
+        await self.task_queue.execute()
 
-        if dependencies:
-            return dependencies
+        self.patches = []
+        self.task_queue = AsyncTaskQueue(
+            logger,
+            batch_size=12,
+            execution_timeout=300
+        )
+        self.task_queue.enqueue([
+            AsyncTask(self.script_patch, script)
+            for script in self.djwc.components.values()
+        ])
+        print(f'Ensuring all scripts have patched imports ...')
+        await self.task_queue.execute()
 
-    async def get_modules(self, sources):
-        results = []
-        for source in sources:
-            parts = source.split('/')
-            async with httpx.AsyncClient() as client:
-                while parts:
-                    results.append(client.get(
-                         f'https://registry.npmjs.org/{"/".join(parts)}/'
-                    ))
-                    parts.pop()
-        return {
-            res.json()['name']: res.json()
-            for res in await asyncio.gather(*results)
-            if res.status_code == 200
-        }
-
-    async def download(self, source):
-        target = self.djwc.static / source
-
-        if target.exists():
+    async def script_patch(self, script, parent=None):
+        if script in self.patches:
             return
-
-        print('+ ' + source)
-
-        if not target.parent.exists():
-            os.makedirs(target.parent)
-
-        url = 'https://unpkg.com/' + source
-        tries = 10
-        while tries:
-            try:
-                filename, headers = request.urlretrieve(url, filename=target)
-            except Exception as e:
-                tries -= 1
-                if not tries:
-                    raise
-                print(e)
-            else:
-                break
+        self.patches.append(script)
+        print(script, ' ...')
+        target = self.djwc.static / script
+        if target.is_dir():
+            target = target / 'index.js'
 
         with open(target, 'r') as f:
             contents = f.read()
 
-        results = set([
-            i[1]
+        results = {
+            i[2]: i[1]
             for i in re.findall(
-                r"""(import|from)\s['"]([^'"]*)['"]""",
+                r"""(import|from)\s(['"])([^'"]*)['"]""",
                 contents,
             )
-        ])
-        downloads = []
-        for module in results:
-            # convert relative paths to absolute paths
-            if module.startswith('.'):
-                module = '/'.join(source.split('/')[:-1]) + '/' + module
-
-            # /./ not needed in a path
-            module = module.replace('/./', '/')
-
-            # cancel out /.. in paths
-            while '/..' in module:
-                module = re.sub('/[^/]*/\.\.', '', module)
-
-            # prevent recursion
-            if module in downloads:
+        }
+        for dependency, quote in results.items():
+            if dependency.startswith(settings.STATIC_URL):
+                dependency = dependency.replace(
+                    f'{settings.STATIC_URL}djwc/',
+                    '',
+                )
+                self.task_queue.enqueue([
+                    AsyncTask(
+                        self.script_patch,
+                        dependency,
+                        script,
+                    )
+                ])
                 continue
 
-            # download OAOO
-            if module not in self.downloading:
-                self.downloading.append(module)
-                downloads.append(self.download(module))
-
-            contents = re.sub(
-                module,
-                f'{settings.STATIC_URL}djwc/{module}',
-                contents,
+            new = dependency
+            if dependency.startswith('.'):
+                new = str(
+                    (self.djwc.static / script / '..' / dependency).resolve()
+                ).replace(f'{self.djwc.static}/', '')
+            new_path = f'{settings.STATIC_URL}djwc/{new}'
+            contents = contents.replace(
+                quote + dependency + quote,
+                quote + new_path + quote,
             )
 
-        with open(target, 'w+') as f:
+            if contents.find('static/djwc//static/djwc') >= 0:
+                breakpoint()
+
+            self.task_queue.enqueue([AsyncTask(self.script_patch, new, script)])
+
+        with open(target, 'w') as f:
             f.write(contents)
 
-        await asyncio.gather(*downloads)
+    async def script_install(self, name):
+        parts = name.split('/')
+        if name.endswith('.js'):
+            parts = parts[:-1]
+
+        tests = []
+        async with httpx.AsyncClient() as client:
+            while parts:
+                tests.append(client.get(
+                     f'https://registry.npmjs.org/{"/".join(parts)}/'
+                ))
+                parts.pop()
+        results = await asyncio.gather(*tests)
+        for result in results:
+            if result.status_code == 200:
+                break
+        if not result.status_code:
+            print('Could not figure module for ' + name)
+            return
+
+        module = result.json()
+        if module['name'] in self.modules:
+            return
+        self.modules[module['name']] = module
+
+        latest = module['dist-tags']['latest']
+        url = module['versions'][latest]['dist']['tarball']
+
+        target = self.djwc.static / module['name']
+        if not target.exists():
+            print(name + ' installing ...')
+            os.makedirs(target)
+            temp = self.djwc.static / url.split('/')[-1]
+            cmd = ' && '.join([
+                shlex.join(['cd', str(target)]),
+                shlex.join(['wget', url]),
+                shlex.join(['tar', 'xvzf', url.split('/')[-1], '--strip=1']),
+                shlex.join(['rm', '-rf', url.split('/')[-1]]),
+            ])
+            proc = await asyncio.create_subprocess_shell(
+                cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            if proc.returncode == 0:
+                print(f'{name} extract success !')
+            else:
+                print(f'[{cmd!r} exited with {proc.returncode}]')
+
+        with open(os.path.join(target, 'package.json'), 'r') as f:
+            package = f.read()
+        package = json.loads(package)
+
+        self.task_queue.enqueue([
+            AsyncTask(self.script_install, script)
+            for script, version in package.get('dependencies', {}).items()
+        ])
