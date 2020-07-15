@@ -16,6 +16,7 @@ setup(
     package_dir={'': 'src'},
     include_package_data=True,
     keywords='django webcomponents',
+    install_requires=['httpx'],
     classifiers=[
         'Development Status :: 1 - Planning',
         'Environment :: Web Environment',
