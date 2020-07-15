@@ -24,18 +24,25 @@ class StaticMiddleware:
                 print(f'Element {tag} not found in registry')
                 continue
 
-            response.content = response.content.replace(
-                b'</head>',
-                b''.join([
-                    b'<script type="module">import ',
-                    b"'",
-                    self.app.bstatic,
-                    self.app.bcomponents[tag].encode('utf8'),
-                    b"'",
-                    b'</script>',
-                    b'</head>',
-                ])
-            )
+            for script in self.app.bcomponents[tag]:
+                src = script['src']
+                if src in loaded:
+                    continue
+                module = script.get('module', True)
+                response.content = response.content.replace(
+                    b'</body>',
+                    b''.join([
+                        b'<script '
+                        b'type="module"' if module else b'nomodule',
+                        b' src="',
+                        self.app.bstatic,
+                        src,
+                        b'">',
+                        b'</script>',
+                        b'</body>',
+                    ])
+                )
+                loaded.append(src)
             loaded.append(tag)
 
         return response

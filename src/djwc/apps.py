@@ -1,3 +1,4 @@
+import copy
 import importlib
 from pathlib import Path
 
@@ -18,8 +19,6 @@ class AppConfig(apps.AppConfig):
         self.components = dict()
 
         for name, config in apps.apps.app_configs.items():
-            if 'polymer' in name:
-                breakpoint()
             self.components.update(getattr(config, 'components', {}))
 
         for lib in DJWC.get('LIBRARIES', []):
@@ -28,6 +27,22 @@ class AppConfig(apps.AppConfig):
         if 'COMPONENTS' in DJWC:
             self.components.update(settings.DJWC['COMPONENTS'])
 
+        for tag, definitions in self.components.items():
+            if not isinstance(definitions, (list, tuple)):
+                definitions = (definitions,)
+
+            self.components[tag] = tuple(
+                definition
+                if isinstance(definition, dict)
+                else dict(src=definition)
+                for definition in definitions
+            )
+
         self.bcomponents = {
-            k.encode('utf8'): v for k, v in self.components.items()
+            tag.encode('utf8'): definitions
+            for tag, definitions in self.components.items()
         }
+        for tag, definition in self.bcomponents.items():
+            for i in range(0, len(self.bcomponents[tag])):
+                self.bcomponents[tag][i]['src'] = \
+                    self.bcomponents[tag][i]['src'].encode('utf8')
