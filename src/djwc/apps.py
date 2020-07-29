@@ -40,7 +40,7 @@ class AppConfig(apps.AppConfig):
 
         self.bcomponents = {
             tag.encode('utf8'): definitions
-            for tag, definitions in self.components.items()
+            for tag, definitions in copy.deepcopy(self.components).items()
         }
         for tag, definition in self.bcomponents.items():
             for i in range(0, len(self.bcomponents[tag])):

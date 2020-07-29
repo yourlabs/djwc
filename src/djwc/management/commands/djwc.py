@@ -34,7 +34,9 @@ class Command(BaseCommand):
         )
         self.task_queue.enqueue([
             AsyncTask(self.script_install, script)
-            for script in self.djwc.components.values()
+            for t in self.djwc.components.values()
+            for d in t
+            for script in d.values()
         ])
         print(f'Ensuring all dependencies extracted in {self.djwc.static} ...')
         await self.task_queue.execute()
@@ -47,7 +49,9 @@ class Command(BaseCommand):
         )
         self.task_queue.enqueue([
             AsyncTask(self.script_patch, script)
-            for script in self.djwc.components.values()
+            for t in self.djwc.components.values()
+            for d in t
+            for script in d.values()
         ])
         print(f'Ensuring all scripts have patched imports ...')
         await self.task_queue.execute()
