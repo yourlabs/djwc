@@ -29,7 +29,7 @@ class Command(BaseCommand):
         logger = logging.getLogger("foo")
         self.task_queue = AsyncTaskQueue(
             logger,
-            batch_size=1,
+            batch_size=12,
             execution_timeout=300
         )
         self.task_queue.enqueue([
