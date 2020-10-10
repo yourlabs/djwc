@@ -16,7 +16,7 @@ class StaticMiddleware:
             return response
 
         loaded = []
-        for tag in re.findall(b'<(?P<t>[a-z]*-[a-z]*)', response.content):
+        for tag in re.findall(b'<([a-z]+-[-a-z]+)', response.content):
             if tag in loaded:
                 continue
 
