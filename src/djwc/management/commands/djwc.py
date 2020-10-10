@@ -56,14 +56,43 @@ class Command(BaseCommand):
         print(f'Ensuring all scripts have patched imports ...')
         await self.task_queue.execute()
 
+    def resolve(self, target, parent=None):
+        print('RESOLVE ', target, parent)
+        if str(target).startswith('.'):
+            # resolve based on parent module
+            return self.resolve((self.djwc.static / parent / '..' / target).resolve())
+
+        target = self.djwc.static / target
+
+        if target.is_dir():
+            # resolve directory from package.json
+            pkg = target / 'package.json'
+            if pkg.exists():
+                with open(pkg, 'r') as f:
+                    pkg = json.loads(f.read())
+                if 'module' in pkg:
+                    filename = pkg['module']
+                elif 'main' in pkg:
+                    filename = pkg['main']
+                else:
+                    filename = 'index.js'
+            return target / filename
+
+        elif not str(target).endswith('.js'):
+            # append .js on filenames
+            js = Path(str(target) + '.js')
+            if js.exists:
+                return js
+
+        return target
+
     async def script_patch(self, script, parent=None):
         if script in self.patches:
             return
         self.patches.append(script)
-        print(script, ' ...')
-        target = self.djwc.static / script
-        if target.is_dir():
-            target = target / 'index.js'
+        target = self.resolve(script, parent)
+        print('MODULE ', script)
+        print('PATCH ', target)
 
         with open(target, 'r') as f:
             contents = f.read()
@@ -90,21 +119,26 @@ class Command(BaseCommand):
                 ])
                 continue
 
-            new = dependency
-            if dependency.startswith('.'):
-                new = str(
-                    (self.djwc.static / script / '..' / dependency).resolve()
-                ).replace(f'{self.djwc.static}/', '')
-            new_path = f'{settings.STATIC_URL}djwc/{new}'
+            new_path = self.resolve(dependency, script)
+            new_imp = str(new_path)[len(str(self.djwc.static) + '/'):]
+            new_url = f'{settings.STATIC_URL}djwc/{new_imp}'
+            print('DEPENDENCY ' + dependency)
+            print('PATH ' + str(new_path))
+            print('IMP ' + new_imp)
+            print('URL ' + new_url)
+            if script.startswith('.'):
+                breakpoint()
+                new_path = self.resolve(dependency, script)
             contents = contents.replace(
                 quote + dependency + quote,
-                quote + new_path + quote,
+                quote + new_url + quote,
             )
 
-            if contents.find('static/djwc//static/djwc') >= 0:
-                breakpoint()
-
-            self.task_queue.enqueue([AsyncTask(self.script_patch, new, script)])
+            self.task_queue.enqueue([AsyncTask(
+                self.script_patch,
+                new_imp,
+                script,
+            )])
 
         with open(target, 'w') as f:
             f.write(contents)
@@ -130,6 +164,10 @@ class Command(BaseCommand):
             return
 
         module = result.json()
+        if 'name' not in module:
+            import sys
+            print('NPM module not found', name)
+            sys.exit(1)
         if module['name'] in self.modules:
             return
         self.modules[module['name']] = module
