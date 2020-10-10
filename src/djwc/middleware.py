@@ -30,7 +30,7 @@ class StaticMiddleware:
                     continue
                 module = script.get('module', True)
                 response.content = response.content.replace(
-                    b'</body>',
+                    b'</head>',
                     b''.join([
                         b'<script '
                         b'type="module"' if module else b'nomodule',
@@ -39,7 +39,7 @@ class StaticMiddleware:
                         src,
                         b'">',
                         b'</script>',
-                        b'</body>',
+                        b'</head>',
                     ])
                 )
                 loaded.append(src)
