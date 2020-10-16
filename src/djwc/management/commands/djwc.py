@@ -44,7 +44,7 @@ class Command(BaseCommand):
         self.patches = []
         self.task_queue = AsyncTaskQueue(
             logger,
-            batch_size=12,
+            batch_size=60,
             execution_timeout=300
         )
         self.task_queue.enqueue([

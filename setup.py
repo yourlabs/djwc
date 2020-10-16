@@ -16,7 +16,7 @@ setup(
     package_dir={'': 'src'},
     include_package_data=True,
     keywords='django webcomponents',
-    install_requires=['httpx', 'async-task-queue'],
+    install_requires=['httpx==0.14.3', 'async-task-queue'],
     classifiers=[
         'Development Status :: 1 - Planning',
         'Environment :: Web Environment',
