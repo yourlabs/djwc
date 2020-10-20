@@ -16,6 +16,13 @@ class StaticMiddleware:
             return response
 
         loaded = []
+        marker = b'<!-- djwc-modules -->'
+        if marker not in response.content:
+            response.content = response.content.replace(
+                b'</head>',
+                marker + b'</head>',
+            )
+
         for tag in re.findall(b'<([a-z]+-[-a-z]+)', response.content):
             if tag in loaded:
                 continue
@@ -30,7 +37,7 @@ class StaticMiddleware:
                     continue
                 module = script.get('module', True)
                 response.content = response.content.replace(
-                    b'</head>',
+                    marker,
                     b''.join([
                         b'<script '
                         b'type="module"' if module else b'nomodule',
@@ -39,7 +46,7 @@ class StaticMiddleware:
                         src,
                         b'">',
                         b'</script>',
-                        b'</head>',
+                        marker,
                     ])
                 )
                 loaded.append(src)
