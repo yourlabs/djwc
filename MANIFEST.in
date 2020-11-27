@@ -1,0 +1,4 @@
+include *.md *.rst LICENSE
+recursive-include src *.html *.css *.js *.py *.po *.mo
+prune src/djwc/static/djwc
+
